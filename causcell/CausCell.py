@@ -123,8 +123,8 @@ class CausCell:
                      timesteps=1000):
         factor_order = concept_list
         profile_size = trained_profile_size
-        model_denoise = Denoise_net(profile_size, profile_size, len(concept_counts) + 1, torch.tensor(concept_cdag).float(), concept_counts).cuda()
-        GaussianDiffusion_model = GaussianDiffusion(model_denoise, profile_size = profile_size, timesteps = timesteps).cuda()
+        model_denoise = Denoise_net(profile_size, profile_size, len(concept_counts) + 1, torch.tensor(concept_cdag).float(), concept_counts).to(self.device)
+        GaussianDiffusion_model = GaussianDiffusion(model_denoise, profile_size = profile_size, timesteps = timesteps).to(self.device)
         data = torch.load(str(Path(results_folder) / f'model-{milestone}.pt'))
         GaussianDiffusion_model.load_state_dict(data['model'])
         self.model = deepcopy(GaussianDiffusion_model)
@@ -142,9 +142,9 @@ class CausCell:
             disentanglement_embs = []
             generated_samples = []
             for idx, data_ in enumerate(dataloader):
-                batch_concept_embs = self.model.denosie_fn.DisentanglementEncoder.eval()(data_[0].cuda(), data_[1].cuda())[0].cpu()
+                batch_concept_embs = self.model.denosie_fn.DisentanglementEncoder.eval()(data_[0].to(self.device), data_[1].to(self.device))[0].cpu()
                 disentanglement_embs.append(batch_concept_embs)
-                samples_with_cross_attention = self.model.sample_with_factor(concept_embs = batch_concept_embs.cuda(), batch_size = len(data_[0]))
+                samples_with_cross_attention = self.model.sample_with_factor(concept_embs = batch_concept_embs.to(self.device), batch_size = len(data_[0]))
                 generated_samples.append(samples_with_cross_attention.cpu())
             if len(generated_samples) >= 2:
                 # generated_samples = np.array(generated_samples)
@@ -165,7 +165,7 @@ class CausCell:
             dataloader = data.DataLoader(dataset, batch_size = 1280, shuffle = False, pin_memory = True)
             disentanglement_embs = []
             for idx, data_ in enumerate(dataloader):
-                batch_concept_embs = self.model.denosie_fn.DisentanglementEncoder.eval()(data_[0].cuda(), data_[1].cuda())[0].cpu()
+                batch_concept_embs = self.model.denosie_fn.DisentanglementEncoder.eval()(data_[0].to(self.device), data_[1].to(self.device))[0].cpu()
                 disentanglement_embs.append(batch_concept_embs)
             
             concept_embs = [[] for _ in range(len(concept_list) + 1)]
@@ -202,7 +202,7 @@ class CausCell:
         factor_scores = []
         with torch.no_grad():
             for idx, predictor in enumerate(self.model.denosie_fn.DisentanglementEncoder.label_predictor):
-                scores = predictor.eval()(torch.tensor(concept_embs[idx]).cuda())
+                scores = predictor.eval()(torch.tensor(concept_embs[idx]).to(self.device))
                 factor_scores.append(np.array(scores.cpu()))
         pred_labels = [i.argmax(axis = 1) for i in factor_scores]
         test_data = sc.read_h5ad(testing_data_pwd)

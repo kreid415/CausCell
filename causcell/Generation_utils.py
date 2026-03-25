@@ -18,7 +18,7 @@ def sampling(model, data_pwd, profile_size, factor_list, batch_size):
         dataloader = data.DataLoader(dataset, batch_size = batch_size, shuffle = False, pin_memory = True)
         disentanglement_embs = []
         for idx, data_ in enumerate(dataloader):
-            batch_concept_embs = model.denosie_fn.DisentanglementEncoder.extract_exogenous_embs(data_.cuda()).cpu()
+            batch_concept_embs = model.denosie_fn.DisentanglementEncoder.extract_exogenous_embs(data_.to(model.device)).cpu()
             disentanglement_embs.append(batch_concept_embs)
         concept_embs = [[] for _ in range(len(factor_list) + 1)]
         for factor in range(len(factor_list) + 1):
@@ -83,8 +83,9 @@ def multi_target_generation(ori_data_pwd,
     training_lr = 2e-5
 
     profile_size = training_profile_size
-    model_denoise = Denoise_net(profile_size, profile_size, len(factor_counts) + 1, torch.tensor(factor_cdag).float(), factor_counts).cuda()
-    GaussianDiffusion_model = GaussianDiffusion(model_denoise, profile_size = profile_size, timesteps = 1000).cuda()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model_denoise = Denoise_net(profile_size, profile_size, len(factor_counts) + 1, torch.tensor(factor_cdag).float(), factor_counts).to(device)
+    GaussianDiffusion_model = GaussianDiffusion(model_denoise, profile_size = profile_size, timesteps = 1000).to(device)
     trainer = Trainer(GaussianDiffusion_model, training_data_pwd, factor_list,
                     profile_size = training_profile_size, 
                     train_batch_size = training_batch_size, 
@@ -115,7 +116,7 @@ def multi_target_generation(ori_data_pwd,
         for ii in range(steps):
             batch_concept_embs = train_concept_embs[:, ii*batch_sz:(ii+1)*batch_sz,:]
             batch_concept_embs = np.transpose(batch_concept_embs, (1,0,2))
-            samples_with_cross_attention = trainer.model.sample_with_factor(concept_embs = torch.tensor(batch_concept_embs).cuda(), batch_size = batch_concept_embs.shape[0])
+            samples_with_cross_attention = trainer.model.sample_with_factor(concept_embs = torch.tensor(batch_concept_embs).to(device), batch_size = batch_concept_embs.shape[0])
             generated_samples.append(samples_with_cross_attention.cpu())
         generated_samples = np.array(generated_samples)
         generated_samples = np.concatenate([np.array(i,dtype=float) for i in generated_samples])
@@ -191,7 +192,8 @@ def generation_based_concept_embs(model, concept_embs, save_pwd,
         for ii in range(steps):
             batch_concept_embs = train_concept_embs[:, ii*batch_sz:(ii+1)*batch_sz,:]
             batch_concept_embs = np.transpose(batch_concept_embs, (1,0,2))
-            samples_with_cross_attention = model.sample_with_factor(concept_embs = torch.tensor(batch_concept_embs).cuda(), batch_size = batch_concept_embs.shape[0])
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            samples_with_cross_attention = model.sample_with_factor(concept_embs = torch.tensor(batch_concept_embs).to(device), batch_size = batch_concept_embs.shape[0])
             generated_samples.append(samples_with_cross_attention.cpu())
         generated_samples = np.concatenate([np.array(i,dtype=float) for i in generated_samples])
     new_generated_data = ad.AnnData(generated_samples)

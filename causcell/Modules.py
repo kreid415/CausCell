@@ -751,6 +751,10 @@ class Trainer(object):
         
         self.step = 0
         
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        diffusion_model.to(self.device)
+
+        
         assert not fp16 or fp16 and APEX_AVAILABLE, 'Apex must be installed in order for mixed precision training to be turned on'
 
         self.fp16 = fp16
@@ -795,7 +799,7 @@ class Trainer(object):
         while self.step <= self.train_num_steps:
             for i in range(self.gradient_accumulate_every):
                 data = next(self.dl)
-                loss_recon, mask_recon_loss, loss_pred_o, loss_discriminator, prior_kl = self.model(data[0].cuda(), data[1].cuda(), data[2].cuda())
+                loss_recon, mask_recon_loss, loss_pred_o, loss_discriminator, prior_kl = self.model(data[0].to(self.device), data[1].to(self.device), data[2].to(self.device))
                 loss = loss_recon + loss_pred_o + loss_discriminator + prior_kl
                 # loss = loss_recon
                 # loss = loss_pred_o
